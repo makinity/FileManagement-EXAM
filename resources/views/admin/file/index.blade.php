@@ -1,6 +1,9 @@
 @extends('layouts.admin')
 
 @section('styles')
+    <link rel="stylesheet" href="{{ asset('backend/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('backend/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+
     <style>
         .file-path-text {
             word-break: break-all;
@@ -81,7 +84,7 @@
                         data-target="#createFileModal"
                         data-file-create="true"
                         data-active-type="{{ $activeType }}">
-                        <i class="fas fa-plus mr-1"></i>Create File
+                        <i class="fas fa-plus mr-1"></i>New
                     </button>
                 </div>
 
@@ -131,7 +134,7 @@
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
-                            <table class="table table-bordered table-hover mb-0">
+                            <table id="fileTable" class="table table-bordered table-hover mb-0">
                                 <thead>
                                     <tr>
                                         <th>File Name</th>
@@ -165,7 +168,9 @@
                                                 </span>
                                             </td>
                                             <td class="align-middle">
-                                                {{ optional($file->updated_at)->format('M d, Y h:i A') }}
+                                                <span data-order="{{ optional($file->updated_at)->timestamp ?? 0 }}">
+                                                    {{ optional($file->updated_at)->format('M d, Y h:i A') }}
+                                                </span>
                                             </td>
                                             <td class="align-middle text-center">
                                                 <div class="btn-group" role="group" aria-label="File actions">
@@ -240,9 +245,32 @@
 @endsection
 
 @section('scripts')
+    <script src="{{ asset('backend/plugins/datatables/jquery.dataTables.min.js') }}"></script>
+    <script src="{{ asset('backend/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
+    <script src="{{ asset('backend/plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
+    <script src="{{ asset('backend/plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
+
     <script>
         $(function () {
             const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
+            const fileTable = $('#fileTable').DataTable({
+                responsive: true,
+                autoWidth: false,
+                pageLength: 10,
+                lengthMenu: [[5, 10, 25, 50, -1], [5, 10, 25, 50, 'All']],
+                order: [[4, 'desc']],
+                columnDefs: [
+                    { orderable: false, targets: [5] },
+                    { searchable: false, targets: [5] },
+                ],
+                language: {
+                    search: 'Search files:',
+                    lengthMenu: 'Show _MENU_ files',
+                    info: 'Showing _START_ to _END_ of _TOTAL_ files',
+                    infoEmpty: 'Showing 0 to 0 of 0 files',
+                    zeroRecords: 'No matching files found',
+                }
+            });
 
             function fillText(selector, value, fallback) {
                 $(selector).text(value && value.length ? value : fallback);
@@ -479,20 +507,20 @@
                 $('#viewPreviewIframeNote').addClass('d-none');
             });
 
-            $('[data-file-view]').on('click', function () {
+            $(document).on('click', '[data-file-view]', function () {
                 populateViewModal($(this));
             });
 
-            $('[data-file-create]').on('click', function () {
+            $(document).on('click', '[data-file-create]', function () {
                 populateCreateModal($(this));
             });
 
-            $('[data-file-edit]').on('click', function () {
+            $(document).on('click', '[data-file-edit]', function () {
                 $('#editFileForm').data('fileId', $(this).attr('data-file-id'));
                 populateEditModal($(this));
             });
 
-            $('[data-file-delete]').on('click', function () {
+            $(document).on('click', '[data-file-delete]', function () {
                 populateDeleteModal($(this));
             });
 
