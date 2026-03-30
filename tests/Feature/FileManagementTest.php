@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\File;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File as FileSystem;
 use Tests\TestCase;
 
 class FileManagementTest extends TestCase
@@ -53,6 +53,27 @@ class FileManagementTest extends TestCase
         $response->assertViewHas('activeType', 'pdf');
     }
 
+    public function test_store_creates_file_and_uploads_it_to_public_uploads_directory(): void
+    {
+        $upload = UploadedFile::fake()->image('school-logo.png');
+
+        $response = $this->post(route('file.store'), [
+            'file_name' => 'School Logo',
+            'description' => 'Uploaded image file',
+            'uploaded_file' => $upload,
+            'active_type' => 'pdf',
+        ]);
+
+        $file = File::firstOrFail();
+
+        $response->assertRedirect(route('file.index', ['type' => 'png']));
+        $this->assertSame('School Logo', $file->file_name);
+        $this->assertSame('Uploaded image file', $file->description);
+        $this->assertSame('png', $file->file_type);
+        $this->assertStringStartsWith('uploads/files/', $file->file_path);
+        $this->assertFileExists(public_path($file->file_path));
+    }
+
     public function test_update_without_replacement_changes_metadata_only(): void
     {
         $file = $this->createFile([
@@ -81,13 +102,13 @@ class FileManagementTest extends TestCase
 
     public function test_update_with_replacement_stores_new_file_and_removes_old_managed_file(): void
     {
-        Storage::fake('public');
-        Storage::disk('public')->put('files/original.pdf', 'old-file');
+        FileSystem::ensureDirectoryExists(public_path('uploads/files'));
+        FileSystem::put(public_path('uploads/files/original.pdf'), 'old-file');
 
         $file = $this->createFile([
             'file_name' => 'Policies.pdf',
             'description' => 'Original description',
-            'file_path' => 'files/original.pdf',
+            'file_path' => 'uploads/files/original.pdf',
             'file_type' => 'pdf',
         ]);
 
@@ -111,19 +132,19 @@ class FileManagementTest extends TestCase
         $this->assertSame('Updated Manual', $file->file_name);
         $this->assertSame('Replaced file', $file->description);
         $this->assertSame('docx', $file->file_type);
-        $this->assertNotSame('files/original.pdf', $file->file_path);
-        Storage::disk('public')->assertMissing('files/original.pdf');
-        Storage::disk('public')->assertExists($file->file_path);
+        $this->assertNotSame('uploads/files/original.pdf', $file->file_path);
+        $this->assertFileDoesNotExist(public_path('uploads/files/original.pdf'));
+        $this->assertFileExists(public_path($file->file_path));
     }
 
     public function test_destroy_removes_db_row_and_managed_file(): void
     {
-        Storage::fake('public');
-        Storage::disk('public')->put('files/removable.pdf', 'delete-me');
+        FileSystem::ensureDirectoryExists(public_path('uploads/files'));
+        FileSystem::put(public_path('uploads/files/removable.pdf'), 'delete-me');
 
         $file = $this->createFile([
             'file_name' => 'Removable.pdf',
-            'file_path' => 'files/removable.pdf',
+            'file_path' => 'uploads/files/removable.pdf',
             'file_type' => 'pdf',
         ]);
 
@@ -137,7 +158,7 @@ class FileManagementTest extends TestCase
             'id' => $file->id,
         ]);
 
-        Storage::disk('public')->assertMissing('files/removable.pdf');
+        $this->assertFileDoesNotExist(public_path('uploads/files/removable.pdf'));
     }
 
     public function test_destroy_succeeds_when_legacy_file_is_missing(): void
@@ -174,6 +195,24 @@ class FileManagementTest extends TestCase
         $response->assertSessionHasErrors('file_name');
         $response->assertSessionHas('open_modal', 'edit');
         $response->assertSessionHas('modal_file_id', $file->id);
+    }
+
+    public function test_invalid_create_redirects_back_with_errors_and_create_modal_state(): void
+    {
+        $response = $this->from(route('file.index', ['type' => 'pdf']))
+            ->post(route('file.store'), [
+                'file_name' => '',
+                'description' => 'Missing upload',
+                'active_type' => 'pdf',
+            ]);
+
+        $response->assertRedirect(route('file.index', ['type' => 'pdf']));
+        $response->assertSessionHasErrors([
+            'file_name',
+            'uploaded_file',
+        ]);
+        $response->assertSessionHas('open_modal', 'create');
+        $this->assertDatabaseCount('files', 0);
     }
 
     private function createFile(array $attributes = []): File

@@ -74,7 +74,15 @@
                         <h1 class="mb-1">File Management</h1>
                         <p class="text-muted mb-0">Browse, inspect, update, and remove stored file records.</p>
                     </div>
-                    <span class="badge badge-primary p-2">Visible Files: {{ $files->count() }}</span>
+                    <button
+                        type="button"
+                        class="btn btn-primary"
+                        data-toggle="modal"
+                        data-target="#createFileModal"
+                        data-file-create="true"
+                        data-active-type="{{ $activeType }}">
+                        <i class="fas fa-plus mr-1"></i>Create File
+                    </button>
                 </div>
 
                 @if (session('success'))
@@ -86,7 +94,7 @@
                     </div>
                 @endif
 
-                @if ($errors->any() && session('open_modal') !== 'edit')
+                @if ($errors->any() && ! in_array(session('open_modal'), ['edit', 'create'], true))
                     <div class="alert alert-danger alert-dismissible fade show" role="alert">
                         <strong>There were problems with your request.</strong>
                         <ul class="mb-0 pl-3">
@@ -373,6 +381,13 @@
                 populateEditPreview(button);
             }
 
+            function populateCreateModal(button) {
+                $('#createFileForm')[0].reset();
+                $('#createActiveType').val(button.attr('data-active-type'));
+                $('#createPreviewIframeNote').addClass('d-none');
+                clearPreview('create');
+            }
+
             function populateDeleteModal(button) {
                 $('#deleteFileForm').attr('action', button.attr('data-action'));
                 $('#deleteFileName').text(button.attr('data-file-name'));
@@ -419,9 +434,44 @@
                 }
             });
 
+            $('#createUploadedFile').on('change', function () {
+                const selectedFile = this.files && this.files[0] ? this.files[0] : null;
+                const iframeNote = $('#createPreviewIframeNote');
+
+                iframeNote.addClass('d-none');
+
+                if (!selectedFile) {
+                    clearPreview('create');
+                    return;
+                }
+
+                const objectUrl = URL.createObjectURL(selectedFile);
+                const fileNameParts = selectedFile.name.split('.');
+                const fileType = fileNameParts.length > 1 ? fileNameParts.pop().toLowerCase() : '';
+                const isImage = selectedFile.type && selectedFile.type.indexOf('image/') === 0 ? '1' : '0';
+
+                renderPreview('create', {
+                    url: objectUrl,
+                    objectUrl: objectUrl,
+                    openable: true,
+                    fileType: fileType,
+                    isImage: isImage,
+                    emptyMessage: 'Preview is not available for the selected file.',
+                });
+
+                if (!isImageFileType(fileType, isImage)) {
+                    iframeNote.removeClass('d-none');
+                }
+            });
+
             $('#editFileModal').on('hidden.bs.modal', function () {
                 clearPreview('edit');
                 $('#editReplacementFile').val('');
+            });
+
+            $('#createFileModal').on('hidden.bs.modal', function () {
+                clearPreview('create');
+                $('#createUploadedFile').val('');
             });
 
             $('#viewFileModal').on('hidden.bs.modal', function () {
@@ -431,6 +481,10 @@
 
             $('[data-file-view]').on('click', function () {
                 populateViewModal($(this));
+            });
+
+            $('[data-file-create]').on('click', function () {
+                populateCreateModal($(this));
             });
 
             $('[data-file-edit]').on('click', function () {
@@ -454,6 +508,10 @@
                 }
 
                 $('#editFileModal').modal('show');
+            @endif
+
+            @if (session('open_modal') === 'create')
+                $('#createFileModal').modal('show');
             @endif
         });
     </script>

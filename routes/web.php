@@ -29,6 +29,7 @@ Route::prefix('admin')->group(function(){
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard.index');
 
     Route::get('/files', [FileManagementController::class, 'index'])->name('file.index');
+    Route::post('/files', [FileManagementController::class, 'store'])->name('file.store');
     Route::put('/files/{file}', [FileManagementController::class, 'update'])->name('file.update');
     Route::delete('/files/{file}', [FileManagementController::class, 'destroy'])->name('file.destroy');
 });

@@ -2,6 +2,101 @@
     $modalFile = session('open_modal') === 'edit' ? $files->firstWhere('id', session('modal_file_id')) : null;
 @endphp
 
+<div class="modal fade" id="createFileModal" tabindex="-1" role="dialog" aria-labelledby="createFileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg file-modal-dialog" role="document">
+        <div class="modal-content">
+            <form id="createFileForm" action="{{ route('file.store') }}" method="POST" enctype="multipart/form-data">
+                @csrf
+
+                <div class="modal-header bg-primary">
+                    <h5 class="modal-title" id="createFileModalLabel">Create File</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    @if ($errors->any() && session('open_modal') === 'create')
+                        <div class="alert alert-danger">
+                            <strong>Unable to create file.</strong>
+                            <ul class="mb-0 pl-3">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
+                    <div class="file-preview-card mb-4 d-none" id="createPreviewWrapper">
+                        <div class="file-preview-stage">
+                            <img
+                                src=""
+                                alt="Selected file preview"
+                                class="file-preview-image d-none"
+                                id="createPreviewImage">
+                            <iframe
+                                src="about:blank"
+                                class="file-preview-frame d-none"
+                                id="createPreviewFrame"></iframe>
+                            <div class="file-preview-empty" id="createPreviewEmpty">
+                                Select a file to preview it before saving.
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white">
+                            <span class="text-muted d-none file-preview-note" id="createPreviewIframeNote">
+                                Browser preview depends on file-type support. If the iframe stays blank, the file can still be uploaded.
+                            </span>
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="active_type" id="createActiveType" value="{{ old('active_type', $activeType) }}">
+
+                    <div class="form-group">
+                        <label for="createFileName">File Name</label>
+                        <input type="text"
+                               class="form-control @error('file_name') is-invalid @enderror"
+                               id="createFileName"
+                               name="file_name"
+                               value="{{ old('file_name') }}"
+                               required>
+                        @error('file_name')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="form-group">
+                        <label for="createFileDescription">Description</label>
+                        <textarea class="form-control @error('description') is-invalid @enderror"
+                                  id="createFileDescription"
+                                  name="description"
+                                  rows="4">{{ old('description') }}</textarea>
+                        @error('description')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="form-group mb-0">
+                        <label for="createUploadedFile">Upload File</label>
+                        <input type="file"
+                               class="form-control-file @error('uploaded_file') is-invalid @enderror"
+                               id="createUploadedFile"
+                               name="uploaded_file"
+                               required>
+                        @error('uploaded_file')
+                            <div class="text-danger small mt-1">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create File</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="viewFileModal" tabindex="-1" role="dialog" aria-labelledby="viewFileModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg file-modal-dialog" role="document">
         <div class="modal-content">

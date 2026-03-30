@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\File;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File as FileSystem;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class FileManagementController extends Controller
@@ -52,6 +55,39 @@ class FileManagementController extends Controller
         ]);
     }
 
+    public function store(Request $request)
+    {
+        $activeType = $this->normalizeActiveType($request);
+
+        try {
+            $validated = Validator::make($request->all(), [
+                'file_name' => 'required|string|max:255',
+                'description' => 'nullable|string',
+                'uploaded_file' => 'required|file|max:10240',
+                'active_type' => 'nullable|string',
+            ])->validate();
+        } catch (ValidationException $e) {
+            return redirect()
+                ->route('file.index', array_filter(['type' => $activeType]))
+                ->withErrors($e->validator)
+                ->withInput()
+                ->with('open_modal', 'create');
+        }
+
+        $storedFile = $this->storeUploadedFile($request->file('uploaded_file'));
+
+        $file = File::create([
+            'file_name' => $validated['file_name'],
+            'description' => $validated['description'] ?? null,
+            'file_path' => $storedFile['file_path'],
+            'file_type' => $storedFile['file_type'],
+        ]);
+
+        return redirect()
+            ->route('file.index', array_filter(['type' => $file->file_type]))
+            ->with('success', 'File created successfully.');
+    }
+
     public function update(Request $request, File $file)
     {
         $activeType = $this->normalizeActiveType($request);
@@ -81,18 +117,16 @@ class FileManagementController extends Controller
         ]);
 
         if ($request->hasFile('replacement_file')) {
-            $uploadedFile = $request->file('replacement_file');
-            $storedPath = $uploadedFile->store('files', 'public');
-            $extension = strtolower($uploadedFile->getClientOriginalExtension() ?: $uploadedFile->extension());
+            $storedFile = $this->storeUploadedFile($request->file('replacement_file'));
 
-            $file->file_path = $storedPath;
-            $file->file_type = $extension ?: $file->file_type;
+            $file->file_path = $storedFile['file_path'];
+            $file->file_type = $storedFile['file_type'] ?: $file->file_type;
         }
 
         $file->save();
 
         if ($request->hasFile('replacement_file') && $oldWasManaged && $oldFilePath && $oldFilePath !== $file->file_path) {
-            Storage::disk('public')->delete($oldFilePath);
+            $this->deleteManagedFile($oldFilePath);
         }
 
         return redirect()
@@ -110,7 +144,7 @@ class FileManagementController extends Controller
         $file->delete();
 
         if ($isManagedFile && $filePath) {
-            Storage::disk('public')->delete($filePath);
+            $this->deleteManagedFile($filePath);
         }
 
         return redirect()
@@ -123,5 +157,33 @@ class FileManagementController extends Controller
         $activeType = $request->input('active_type');
 
         return filled($activeType) ? $activeType : null;
+    }
+
+    private function storeUploadedFile(UploadedFile $uploadedFile): array
+    {
+        $targetDirectory = public_path('uploads/files');
+        FileSystem::ensureDirectoryExists($targetDirectory);
+
+        $storedFilename = $uploadedFile->hashName();
+        $uploadedFile->move($targetDirectory, $storedFilename);
+        $extension = strtolower($uploadedFile->getClientOriginalExtension() ?: $uploadedFile->extension());
+
+        return [
+            'file_path' => 'uploads/files/' . $storedFilename,
+            'file_type' => $extension ?: null,
+        ];
+    }
+
+    private function deleteManagedFile(string $filePath): void
+    {
+        if (Str::startsWith($filePath, 'files/')) {
+            Storage::disk('public')->delete($filePath);
+
+            return;
+        }
+
+        if (Str::startsWith($filePath, 'uploads/files/')) {
+            FileSystem::delete(public_path($filePath));
+        }
     }
 }

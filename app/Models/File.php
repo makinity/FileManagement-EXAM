@@ -11,6 +11,9 @@ class File extends Model
 {
     use HasFactory;
 
+    private const MANAGED_STORAGE_PREFIX = 'files/';
+    private const MANAGED_PUBLIC_UPLOAD_PREFIX = 'uploads/files/';
+
     private const IMAGE_TYPES = [
         'jpg',
         'jpeg',
@@ -30,7 +33,21 @@ class File extends Model
 
     public function isManagedPublicFile(): bool
     {
-        return filled($this->file_path) && Str::startsWith($this->file_path, 'files/');
+        return filled($this->file_path)
+            && Str::startsWith($this->file_path, [
+                self::MANAGED_STORAGE_PREFIX,
+                self::MANAGED_PUBLIC_UPLOAD_PREFIX,
+            ]);
+    }
+
+    public function isManagedStorageFile(): bool
+    {
+        return filled($this->file_path) && Str::startsWith($this->file_path, self::MANAGED_STORAGE_PREFIX);
+    }
+
+    public function isManagedUploadFile(): bool
+    {
+        return filled($this->file_path) && Str::startsWith($this->file_path, self::MANAGED_PUBLIC_UPLOAD_PREFIX);
     }
 
     public function hasOpenableFile(): bool
@@ -39,7 +56,7 @@ class File extends Model
             return false;
         }
 
-        if ($this->isManagedPublicFile()) {
+        if ($this->isManagedStorageFile()) {
             return Storage::disk('public')->exists($this->file_path);
         }
 
@@ -52,7 +69,7 @@ class File extends Model
             return null;
         }
 
-        return $this->isManagedPublicFile()
+        return $this->isManagedStorageFile()
             ? Storage::disk('public')->url($this->file_path)
             : asset($this->file_path);
     }
